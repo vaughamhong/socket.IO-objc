@@ -26,6 +26,7 @@
 @class SocketIO;
 @class SocketIOPacket;
 
+typedef void(^SocketIOConnectionCallback)(BOOL connected);
 typedef void(^SocketIOCallback)(id argsData);
 
 extern NSString* const SocketIOError;
@@ -80,11 +81,13 @@ typedef enum {
 @property (nonatomic, readonly) BOOL isConnected, isConnecting;
 @property (nonatomic) BOOL useSecure;
 @property (nonatomic, unsafe_unretained) id<SocketIODelegate> delegate;
+@property (nonatomic, copy) SocketIOConnectionCallback connectionCallback;
 
 - (id) initWithDelegate:(id<SocketIODelegate>)delegate;
 - (void) connectToHost:(NSString *)host onPort:(NSInteger)port;
 - (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params;
 - (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params withNamespace:(NSString *)endpoint;
+- (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params withNamespace:(NSString *)endpoint withCallback:(SocketIOConnectionCallback)callback;
 - (void) disconnect;
 
 - (void) sendMessage:(NSString *)data;

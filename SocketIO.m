@@ -76,7 +76,8 @@ NSString* const SocketIOException = @"SocketIOException";
 @synthesize isConnected = _isConnected, 
             isConnecting = _isConnecting, 
             useSecure = _useSecure, 
-            delegate = _delegate;
+            delegate = _delegate,
+            connectionCallback = _connectionCallback;
 
 - (id) initWithDelegate:(id<SocketIODelegate>)delegate
 {
@@ -102,8 +103,14 @@ NSString* const SocketIOException = @"SocketIOException";
 
 - (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params withNamespace:(NSString *)endpoint
 {
+    [self connectToHost:host onPort:port withParams:params withNamespace:endpoint withCallback:nil];
+}
+
+- (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params withNamespace:(NSString *)endpoint withCallback:(SocketIOConnectionCallback)callback
+{
     if (!_isConnected && !_isConnecting) {
         _isConnecting = YES;
+        self.connectionCallback = callback;
         
         _host = host;
         _port = port;
@@ -491,8 +498,12 @@ NSString* const SocketIOException = @"SocketIOException";
     
     // send any queued packets
     [self doQueue];
-    
     [self setTimeout];
+    
+    if(_connectionCallback != nil){
+        _connectionCallback(YES);
+        self.connectionCallback = nil;
+    }
 }
 
 - (void) onDisconnect 
@@ -523,6 +534,11 @@ NSString* const SocketIOException = @"SocketIOException";
     if ((wasConnected || wasConnecting)
         && [_delegate respondsToSelector:@selector(socketIODidDisconnect:)]) {
         [_delegate socketIODidDisconnect:self];
+    }
+    
+    if(_connectionCallback != nil){
+        _connectionCallback(NO);
+        self.connectionCallback = nil;
     }
 }
 
