@@ -199,6 +199,7 @@
 			children = (
 				4A4453791589EE7D00B44ABB /* SocketRocket */,
 				4A4453781589EE6300B44ABB /* SBJson */,
+				4ADCCBA815790D760022990C /* Supporting Files */,
 				4ADCCBB015790D760022990C /* AppDelegate.h */,
 				4ADCCBB115790D760022990C /* AppDelegate.m */,
 				4ADCCBB315790D760022990C /* ViewController.h */,
@@ -208,7 +209,6 @@
 				4ADCCBC715790DEC0022990C /* SocketIO.m */,
 				C9E391A015E2A1B00004693A /* SocketIOJSONSerialization.h */,
 				C9E391A115E2A1B00004693A /* SocketIOJSONSerialization.m */,
-				4ADCCBA815790D760022990C /* Supporting Files */,
 			);
 			path = SocketTesterARC;
 			sourceTree = "<group>";
