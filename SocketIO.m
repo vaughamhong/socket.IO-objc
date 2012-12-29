@@ -77,7 +77,8 @@ NSString* const SocketIOException = @"SocketIOException";
             isConnecting = _isConnecting, 
             useSecure = _useSecure, 
             delegate = _delegate,
-            heartbeatTimeout = _heartbeatTimeout;
+            heartbeatTimeout = _heartbeatTimeout,
+            connectionCallback = _connectionCallback;
 
 - (id) initWithDelegate:(id<SocketIODelegate>)delegate
 {
@@ -334,6 +335,11 @@ NSString* const SocketIOException = @"SocketIOException";
     [self doQueue];
     
     [self setTimeout];
+    
+    if(_connectionCallback != nil){
+        _connectionCallback(YES);
+        self.connectionCallback = nil;
+    }
 }
 
 # pragma mark -
