@@ -337,7 +337,7 @@ NSString* const SocketIOException = @"SocketIOException";
     [self setTimeout];
     
     if(_connectionCallback != nil){
-        _connectionCallback(YES);
+        _connectionCallback(nil);
         self.connectionCallback = nil;
     }
 }
@@ -581,7 +581,7 @@ NSString* const SocketIOException = @"SocketIOException";
     }
     
     if(_connectionCallback != nil){
-        _connectionCallback(NO);
+        _connectionCallback(nil);
         self.connectionCallback = nil;
     }
 }
@@ -631,6 +631,11 @@ NSString* const SocketIOException = @"SocketIOException";
     
     _isConnected = NO;
     _isConnecting = NO;
+    
+    if(_connectionCallback != nil){
+        _connectionCallback(error);
+        self.connectionCallback = nil;
+    }
     
     if ([_delegate respondsToSelector:@selector(socketIO:onError:)]) {
         NSMutableDictionary *errorInfo = [NSDictionary dictionaryWithObject:error forKey:NSLocalizedDescriptionKey];

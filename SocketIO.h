@@ -28,7 +28,7 @@
 @class SocketIO;
 @class SocketIOPacket;
 
-typedef void(^SocketIOConnectionCallback)(BOOL connected);
+typedef void(^SocketIOConnectionCallback)(NSError *error);
 typedef void(^SocketIOCallback)(id argsData);
 
 extern NSString* const SocketIOError;
