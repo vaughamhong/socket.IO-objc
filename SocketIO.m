@@ -157,13 +157,16 @@ NSString* const SocketIOException = @"SocketIOException";
     }
 }
 
-- (void) disconnect
+- (void) disconnectWaitForAck:(BOOL)wait
 {
     if (_isConnected) {
         [self sendDisconnect];
     }
     else if (_isConnecting) {
         [_handshake cancel];
+    }
+    if (!wait) {
+        [self onDisconnect:nil];
     }
 }
 
