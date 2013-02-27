@@ -649,10 +649,6 @@ NSString* const SocketIOException = @"SocketIOException";
         
         [_delegate socketIO:self onError:err];
     }
-    // TODO: deprecated - to be removed
-    else if ([_delegate respondsToSelector:@selector(socketIOHandshakeFailed:)]) {
-        [_delegate socketIOHandshakeFailed:self];
-    }
 }
 
 - (void) connectionDidFinishLoading:(NSURLConnection *)connection 
@@ -729,10 +725,6 @@ NSString* const SocketIOException = @"SocketIOException";
 
         if ([_delegate respondsToSelector:@selector(socketIO:onError:)]) {
             [_delegate socketIO:self onError:error];
-        }
-        // TODO: deprecated - to be removed
-        else if ([_delegate respondsToSelector:@selector(socketIO:failedToConnectWithError:)]) {
-            [_delegate socketIO:self failedToConnectWithError:error];
         }
         
         // make sure to do call all cleanup code
