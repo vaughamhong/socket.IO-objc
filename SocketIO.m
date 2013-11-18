@@ -79,7 +79,7 @@ NSString* const SocketIOException = @"SocketIOException";
             useSecure = _useSecure, 
             delegate = _delegate,
             heartbeatTimeout = _heartbeatTimeout,
-            connectionCallback = _connectionCallback;
+            connectionCallback = _connectionCallback,
             returnAllDataFromAck = _returnAllDataFromAck;
 
 - (id) initWithDelegate:(id<SocketIODelegate>)delegate
