@@ -119,10 +119,15 @@ NSString* const SocketIOException = @"SocketIOException";
          withNamespace:(NSString *)endpoint
  withConnectionTimeout:(NSTimeInterval)connectionTimeout
 {
-    [self connectToHost:host onPort:port withParams:params withNamespace:endpoint withCallback:nil];
+    [self connectToHost:host onPort:port withParams:params withNamespace:endpoint withConnectionTimeout:connectionTimeout withCallback:nil];
 }
 
-- (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params withNamespace:(NSString *)endpoint withCallback:(SocketIOConnectionCallback)callback
+- (void) connectToHost:(NSString *)host
+                onPort:(NSInteger)port
+            withParams:(NSDictionary *)params
+         withNamespace:(NSString *)endpoint
+ withConnectionTimeout:(NSTimeInterval)connectionTimeout
+          withCallback:(SocketIOConnectionCallback)callback
 {
     if (!_isConnected && !_isConnecting) {
         _isConnecting = YES;
@@ -709,12 +714,12 @@ NSString* const SocketIOException = @"SocketIOException";
         [_delegate socketIO:self onError:err];
     }
     // TODO: deprecated - to be removed
-    else if ([_delegate respondsToSelector:@selector(socketIOHandshakeFailed:)]) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        [_delegate socketIOHandshakeFailed:self];
-#pragma clang diagnostic pop
-    }
+//    else if ([_delegate respondsToSelector:@selector(socketIOHandshakeFailed:)]) {
+//#pragma clang diagnostic push
+//#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+//        [_delegate socketIOHandshakeFailed:self];
+//#pragma clang diagnostic pop
+//    }
 }
 
 - (void) connectionDidFinishLoading:(NSURLConnection *)connection 
@@ -793,12 +798,12 @@ NSString* const SocketIOException = @"SocketIOException";
             [_delegate socketIO:self onError:error];
         }
         // TODO: deprecated - to be removed
-        else if ([_delegate respondsToSelector:@selector(socketIO:failedToConnectWithError:)]) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            [_delegate socketIO:self failedToConnectWithError:error];
-#pragma clang diagnostic pop
-        }
+//        else if ([_delegate respondsToSelector:@selector(socketIO:failedToConnectWithError:)]) {
+//#pragma clang diagnostic push
+//#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+//            [_delegate socketIO:self failedToConnectWithError:error];
+//#pragma clang diagnostic pop
+//        }
         
         // make sure to do call all cleanup code
         [self onDisconnect:error];
