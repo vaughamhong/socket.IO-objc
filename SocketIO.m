@@ -1,6 +1,6 @@
 //
 //  SocketIO.m
-//  v0.3.0 ARC
+//  v0.4.0.1 ARC
 //
 //  based on 
 //  socketio-cocoa https://github.com/fpotter/socketio-cocoa
@@ -37,10 +37,11 @@
 #define DEBUGLOG(...)
 #endif
 
-static NSString* kInsecureHandshakeURL = @"http://%@/socket.io/1/?t=%d%@";
-static NSString* kInsecureHandshakePortURL = @"http://%@:%d/socket.io/1/?t=%d%@";
-static NSString* kSecureHandshakePortURL = @"https://%@:%d/socket.io/1/?t=%d%@";
-static NSString* kSecureHandshakeURL = @"https://%@/socket.io/1/?t=%d%@";
+static NSString* kResourceName = @"socket.io";
+static NSString* kHandshakeURL = @"%@://%@%@/%@/1/?t=%d%@";
+static NSString* kForceDisconnectURL = @"%@://%@%@/%@/1/xhr-polling/%@?disconnect";
+
+float const defaultConnectionTimeout = 10.0f;
 
 NSString* const SocketIOError     = @"SocketIOError";
 NSString* const SocketIOException = @"SocketIOException";
@@ -79,6 +80,7 @@ NSString* const SocketIOException = @"SocketIOException";
             delegate = _delegate,
             heartbeatTimeout = _heartbeatTimeout,
             connectionCallback = _connectionCallback;
+            returnAllDataFromAck = _returnAllDataFromAck;
 
 - (id) initWithDelegate:(id<SocketIODelegate>)delegate
 {
@@ -88,21 +90,34 @@ NSString* const SocketIOException = @"SocketIOException";
         _queue = [[NSMutableArray alloc] init];
         _ackCount = 0;
         _acks = [[NSMutableDictionary alloc] init];
+        _returnAllDataFromAck = NO;
     }
     return self;
 }
 
 - (void) connectToHost:(NSString *)host onPort:(NSInteger)port
 {
-    [self connectToHost:host onPort:port withParams:nil withNamespace:@""];
+    [self connectToHost:host onPort:port withParams:nil withNamespace:@"" withConnectionTimeout:defaultConnectionTimeout];
 }
 
 - (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params
 {
-    [self connectToHost:host onPort:port withParams:params withNamespace:@""];
+    [self connectToHost:host onPort:port withParams:params withNamespace:@"" withConnectionTimeout:defaultConnectionTimeout];
 }
 
-- (void) connectToHost:(NSString *)host onPort:(NSInteger)port withParams:(NSDictionary *)params withNamespace:(NSString *)endpoint
+- (void) connectToHost:(NSString *)host
+                onPort:(NSInteger)port
+            withParams:(NSDictionary *)params
+         withNamespace:(NSString *)endpoint
+{
+    [self connectToHost:host onPort:port withParams:params withNamespace:endpoint withConnectionTimeout:defaultConnectionTimeout];
+}
+
+- (void) connectToHost:(NSString *)host
+                onPort:(NSInteger)port
+            withParams:(NSDictionary *)params
+         withNamespace:(NSString *)endpoint
+ withConnectionTimeout:(NSTimeInterval)connectionTimeout
 {
     [self connectToHost:host onPort:port withParams:params withNamespace:endpoint withCallback:nil];
 }
@@ -125,28 +140,22 @@ NSString* const SocketIOException = @"SocketIOException";
         }];
         
         // do handshake via HTTP request
-        NSString *s;
-        NSString *format;
-        if (_port) {
-            format = _useSecure ? kSecureHandshakePortURL : kInsecureHandshakePortURL;
-            s = [NSString stringWithFormat:format, _host, _port, rand(), query];
-        }
-        else {
-            format = _useSecure ? kSecureHandshakeURL : kInsecureHandshakeURL;
-            s = [NSString stringWithFormat:format, _host, rand(), query];
-        }
-        DEBUGLOG(@"Connecting to socket with URL: %@", s);
-        NSURL *url = [NSURL URLWithString:s];
+        NSString *protocol = _useSecure ? @"https" : @"http";
+        NSString *port = _port ? [NSString stringWithFormat:@":%d", _port] : @"";
+        NSString *handshakeUrl = [NSString stringWithFormat:kHandshakeURL, protocol, _host, port, kResourceName, rand(), query];
+        
+        DEBUGLOG(@"Connecting to socket with URL: %@", handshakeUrl);
         query = nil;
-                
         
         // make a request
-        NSURLRequest *request = [NSURLRequest requestWithURL:url
+        NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:handshakeUrl]
                                                  cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData 
-                                             timeoutInterval:10.0];
+                                             timeoutInterval:connectionTimeout];
         
-        _handshake = [NSURLConnection connectionWithRequest:request 
-                                                   delegate:self];
+        _handshake = [[NSURLConnection alloc] initWithRequest:request delegate:self startImmediately:NO];
+        [_handshake scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+        [_handshake start];
+        
         if (_handshake) {
             _httpRequestData = [NSMutableData data];
         }
@@ -164,10 +173,31 @@ NSString* const SocketIOException = @"SocketIOException";
     }
     else if (_isConnecting) {
         [_handshake cancel];
+        [self onDisconnect: nil];
+    }
+}
+
+- (void) disconnectForced
+{
+    NSString *protocol = [self useSecure] ? @"https" : @"http";
+    NSString *port = _port ? [NSString stringWithFormat:@":%d", _port] : @"";
+    NSString *urlString = [NSString stringWithFormat:kForceDisconnectURL, protocol, _host, port, kResourceName, _sid];
+    NSURL *url = [NSURL URLWithString:urlString];
+    DEBUGLOG(@"Force disconnect at: %@", urlString);
+    
+    NSURLRequest *request = [NSURLRequest requestWithURL:url];
+    NSError *error = nil;
+    NSHTTPURLResponse *response = nil;
+    
+    [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
+    
+    if (error || [response statusCode] != 200) {
+        DEBUGLOG(@"Error during disconnect: %@", error);
     }
     if (!wait) {
         [self onDisconnect:nil];
     }
+    [self onDisconnect:error];
 }
 
 - (void) sendMessage:(NSString *)data
@@ -229,6 +259,11 @@ NSString* const SocketIOException = @"SocketIOException";
     [self send:packet];
 }
 
+- (void) setResourceName:(NSString *)name
+{
+    kResourceName = [name copy];
+}
+
 # pragma mark -
 # pragma mark private methods
 
@@ -236,6 +271,7 @@ NSString* const SocketIOException = @"SocketIOException";
 {
     SocketIOPacket *packet = [[SocketIOPacket alloc] initWithType:@"disconnect"];
     [self send:packet];
+    [self onDisconnect:nil];
 }
 
 - (void) sendConnect
@@ -251,7 +287,11 @@ NSString* const SocketIOException = @"SocketIOException";
 }
 
 - (void) send:(SocketIOPacket *)packet
-{   
+{
+    if (![self isConnected] && ![self isConnecting]) {
+        DEBUGLOG(@"Already disconnected!");
+        return;
+    }
     DEBUGLOG(@"send()");
     NSNumber *type = [packet typeAsNumber];
     NSMutableArray *encoded = [NSMutableArray arrayWithObject:type];
@@ -369,6 +409,11 @@ NSString* const SocketIOException = @"SocketIOException";
 
 - (void) onTimeout 
 {
+    if (_timeout) {
+        dispatch_source_cancel(_timeout);
+        _timeout = NULL;
+    }
+    
     DEBUGLOG(@"Timed out waiting for heartbeat.");
     [self onDisconnect:[NSError errorWithDomain:SocketIOError
                                            code:SocketIOHeartbeatTimeout
@@ -378,16 +423,29 @@ NSString* const SocketIOException = @"SocketIOException";
 - (void) setTimeout 
 {
     DEBUGLOG(@"start/reset timeout");
-    if (_timeout != nil) {
-        [_timeout invalidate];
-        _timeout = nil;
+    if (_timeout) {
+        dispatch_source_cancel(_timeout);
+        _timeout = NULL;
     }
     
-    _timeout = [NSTimer scheduledTimerWithTimeInterval:_heartbeatTimeout
-                                                target:self 
-                                              selector:@selector(onTimeout) 
-                                              userInfo:nil 
-                                               repeats:NO];
+    _timeout = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER,
+                                      0,
+                                      0,
+                                      dispatch_get_main_queue());
+    
+    dispatch_source_set_timer(_timeout,
+                              dispatch_time(DISPATCH_TIME_NOW, _heartbeatTimeout * NSEC_PER_SEC),
+                              0,
+                              0);
+    
+    __weak SocketIO *weakSelf = self;
+    
+    dispatch_source_set_event_handler(_timeout, ^{
+        [weakSelf onTimeout];
+    });
+    
+    dispatch_resume(_timeout);
+    
 }
 
 
@@ -515,7 +573,8 @@ NSString* const SocketIOException = @"SocketIOException";
                     id argsData = nil;
                     if (argsStr && ![argsStr isEqualToString:@""]) {
                         argsData = [SocketIOJSONSerialization objectFromJSONData:[argsStr dataUsingEncoding:NSUTF8StringEncoding] error:nil];
-                        if ([argsData count] > 0) {
+                        // either send complete response or only the first arg to callback
+                        if (!_returnAllDataFromAck && [argsData count] > 0) {
                             argsData = [argsData objectAtIndex:0];
                         }
                     }
@@ -565,9 +624,9 @@ NSString* const SocketIOException = @"SocketIOException";
     [_queue removeAllObjects];
     
     // Kill the heartbeat timer
-    if (_timeout != nil) {
-        [_timeout invalidate];
-        _timeout = nil;
+    if (_timeout) {
+        dispatch_source_cancel(_timeout);
+        _timeout = NULL;
     }
     
     // Disconnect the websocket, just in case
@@ -603,7 +662,7 @@ NSString* const SocketIOException = @"SocketIOException";
 {
     // check for server status code (http://gigliwood.com/weblog/Cocoa/Q__When_is_an_conne.html)
     if ([response respondsToSelector:@selector(statusCode)]) {
-        int statusCode = [((NSHTTPURLResponse *)response) statusCode];
+        NSInteger statusCode = [((NSHTTPURLResponse *)response) statusCode];
         DEBUGLOG(@"didReceiveResponse() %i", statusCode);
         
         if (statusCode >= 400) {
@@ -649,6 +708,13 @@ NSString* const SocketIOException = @"SocketIOException";
         
         [_delegate socketIO:self onError:err];
     }
+    // TODO: deprecated - to be removed
+    else if ([_delegate respondsToSelector:@selector(socketIOHandshakeFailed:)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        [_delegate socketIOHandshakeFailed:self];
+#pragma clang diagnostic pop
+    }
 }
 
 - (void) connectionDidFinishLoading:(NSURLConnection *)connection 
@@ -685,7 +751,7 @@ NSString* const SocketIOException = @"SocketIOException";
             connectionFailed = true;
         }
         else {
-            // add small buffer of 7sec (magic xD)
+            // add small buffer of 7sec (magic xD) otherwise heartbeat will be too late and connection is closed
             _heartbeatTimeout += 7.0;
         }
         DEBUGLOG(@"heartbeatTimeout: %f", _heartbeatTimeout);
@@ -725,6 +791,13 @@ NSString* const SocketIOException = @"SocketIOException";
 
         if ([_delegate respondsToSelector:@selector(socketIO:onError:)]) {
             [_delegate socketIO:self onError:error];
+        }
+        // TODO: deprecated - to be removed
+        else if ([_delegate respondsToSelector:@selector(socketIO:failedToConnectWithError:)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            [_delegate socketIO:self failedToConnectWithError:error];
+#pragma clang diagnostic pop
         }
         
         // make sure to do call all cleanup code
@@ -767,14 +840,20 @@ didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge
 
 - (void) dealloc
 {
+    [_handshake cancel];
+    _handshake = nil;
+
     _host = nil;
     _sid = nil;
     _endpoint = nil;
     
+    _transport.delegate = nil;
     _transport = nil;
     
-    [_timeout invalidate];
-    _timeout = nil;
+    if (_timeout) {
+        dispatch_source_cancel(_timeout);
+        _timeout = NULL;
+    }
     
     _queue = nil;
     _acks = nil;
